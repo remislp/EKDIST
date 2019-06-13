@@ -1,4 +1,12 @@
-__version__ = "0.0.1"
+__version__ = "0.0.2"
+
+# Version 0.0.2
+# Released 13/06/2019
+# - eklib.py added: calculate moving average, filter rise time; 
+#                   extract amplitudes longer than n filter risetimes
+# - ekplot.py added: dwell time, Popen and amplitude stability plots;
+#                    amplitude histogram
+# - EKDIST_example notebook added
 
 # Version 0.0.1
 # Released 01/05/2019
