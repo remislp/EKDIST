@@ -1,4 +1,9 @@
-__version__ = "0.0.2"
+__version__ = "0.0.3"
+
+# Version 0.0.3
+# Released 14/06/2019
+# - ekplot.py: fitting amplitude histogram with one component Gaussian
+# - Readme.md: example images inserted.
 
 # Version 0.0.2
 # Released 13/06/2019

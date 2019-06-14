@@ -8,9 +8,13 @@ Idealisation of an experimental single channel record produces a list of duratio
 ## Stability plots
 #### Stability plot for amplitudes 
 This plots all the amplitudes as dots against event number.  Such a plot allows to see whether the various amplitude levels stay constant throughout the experiment. Each amplitude by default is shown individually, though it is possible to display a running average of several amplitudes. 
+
+![Amplitude stability](/images/stability_amplitudes.png)
  
 #### Stability plots for open periods, shut times or P(open) 
 In stability plot the open times and shut times, being very variable, are averaged in groups before plotting against event number.  The defaults are to calculate running averages of 50 intervals.  The mean open and shut time, and the Popen calculated from them, are plotted (together or separately) on a log scale against event number.
+
+![Openings/shuttings/Popen stability](/images/stability_open_shut_Popen.png)
 
 ## Amplitudes
 
@@ -19,6 +23,8 @@ In all point amplitude histogram, the contribution (area) of each opening (or sh
 
 #### Histogram of measured amplitudes
 In a histogram of measured amplitudes each opening contributes one value to the histogram, regardless of the length of the opening.  
+
+![Fitted amplitudes histogram with Gaussian fit](/images/histogram_fitted_amplitudes.png)
 
 ## Dwell time distributions
 
@@ -41,7 +47,7 @@ The latter creates symlink which allows any source code change be available loca
 This software is under development. Output is not fully tested, and therefore you should exercise caution if you plan to use the results for production / publication. 
 
 Expected additions: 
-- fit amplitude histogram with Gaussian;
+- fit amplitude histogram with Gaussian multiple components;
 - plot dwell time distribbutions and fit with exponential pdf's;
 - burst analysis;
 - GUI;
