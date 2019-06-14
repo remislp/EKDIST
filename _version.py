@@ -1,4 +1,10 @@
-__version__ = "0.0.3"
+__version__ = "0.0.4"
+
+# Version 0.0.4
+# Released 14/06/2019
+# - Readme.md: updated
+# - ekplot.py: function names changed
+# - ekscn.py: fixed missing imports
 
 # Version 0.0.3
 # Released 14/06/2019

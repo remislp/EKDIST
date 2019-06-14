@@ -6,13 +6,16 @@ Idealisation of an experimental single channel record produces a list of duratio
 ## Imposing resolution 
 
 ## Stability plots
+Stability plots display the measurments made at equilibrium against the measurment number (suggested by Weiss and Magleby, 1989). It allows to check the data for stability before distributions are constructed or fitted. If changes in measurment occur with time the corresponding distribution is meaningless. 
+
 #### Stability plot for amplitudes 
-This plots all the amplitudes as dots against event number.  Such a plot allows to see whether the various amplitude levels stay constant throughout the experiment. Each amplitude by default is shown individually, though it is possible to display a running average of several amplitudes. 
+This plots all the amplitudes as dots against event number.  Such a plot allows to see whether the various amplitude levels stay constant throughout the experiment. Each amplitude by default is shown individually, though it is possible to display a running average of several amplitudes.  Example plot below shows stability plots for amplitudes of single-channel openings of glycine receptor activated by 10 &mu;M of glycine. 
 
 ![Amplitude stability](/images/stability_amplitudes.png)
  
 #### Stability plots for open periods, shut times or P(open) 
 In stability plot the open times and shut times, being very variable, are averaged in groups before plotting against event number.  The defaults are to calculate running averages of 50 intervals.  The mean open and shut time, and the Popen calculated from them, are plotted (together or separately) on a log scale against event number.
+Example plot below shows stability plots for open times, shut times and Popen from single-channel record of glycine receptor activated by 10 &mu;M of glycine. 
 
 ![Openings/shuttings/Popen stability](/images/stability_open_shut_Popen.png)
 

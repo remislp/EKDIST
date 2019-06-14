@@ -1,3 +1,5 @@
+import struct
+import time
 from array import array
 import numpy as np
 

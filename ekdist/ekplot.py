@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from ekdist import eklib
 
-def plot_stability_intervals(rec, open=True, shut=True, popen=True, window=50):
+def stability_intervals(rec, open=True, shut=True, popen=True, window=50):
     opma, shma, poma = eklib.moving_average_open_shut_Popen(rec.opint[:-1], rec.shint, window=window)
     x = np.linspace(0, np.prod(opma.shape), num=np.prod(opma.shape), endpoint=True)
     fig = plt.figure(figsize=(6,3))
@@ -21,7 +21,7 @@ def plot_stability_intervals(rec, open=True, shut=True, popen=True, window=50):
     ax.set_xlabel('Interval number')
     return fig
     
-def plot_stability_amplitudes(rec, window=1):
+def stability_amplitudes(rec, window=1):
     all_resolved_opamp = np.array(rec.rampl)[np.where( np.fabs(np.asarray(rec.rampl)) > 0.0)]
     amps = eklib.moving_average(all_resolved_opamp, window)
     fig = plt.figure(figsize=(6,3))
@@ -33,7 +33,7 @@ def plot_stability_amplitudes(rec, window=1):
     print('Average open amplitude = ', np.average(amps))
     return fig
 
-def plot_fitted_amplitude_histogram(rec, fc, n=2, nbins=20, gauss=True):
+def histogram_fitted_amplitudes(rec, fc, n=2, nbins=20, gauss=True):
     long_opamp = eklib.amplitudes_openings_longer_Tr(rec, fc, n)
     fig = plt.figure(figsize=(6,3))
     ax = fig.add_subplot(111)
