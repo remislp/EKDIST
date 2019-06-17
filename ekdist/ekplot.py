@@ -50,4 +50,70 @@ def histogram_fitted_amplitudes(rec, fc, n=2, nbins=20, gauss=True):
     ax.set_ylabel('Frequency')
     print('Range of amplitudes: {0:.3f} - {1:.3f}'.
           format(min(long_opamp), max(long_opamp)))
-    return fig      
+    return fig   
+
+def __histogram_bins_per_decade(X):
+    nbdec = 12
+    if (len(X) <= 300): nbdec = 5 
+    if (len(X) > 300) and (len(X) <= 1000): nbdec = 8
+    if (len(X) > 1000) and (len(X) <= 3000): nbdec = 10
+    return nbdec
+
+def prepare_xlog_hist(X, tres):
+    """ Prepare x-log histogram.     
+
+    Parameters
+    ----------
+    X :  1-D array or sequence of scalar
+    tres : float
+        Temporal resolution, shortest resolvable time interval. It is
+        histogram's starting point.
+
+    Returns
+    -------
+    xout, yout :  list of scalar
+        x and y values to plot histogram.
+    dx : float
+        Histogram bin width.
+    """
+
+    dx = math.exp(math.log(10.0) / float(__histogram_bins_per_decade(X))) # bin width
+    xstart = tres    # histogramm starts at
+    xend = math.exp(math.ceil(math.log(max(X)))) # round up maximum value
+    nbin = int(math.log(xend / xstart) / math.log(dx))
+    xaxis = tres * np.array([dx**i for i in range(nbin+1)])
+
+    # Sorts data into bins.
+    freq = np.zeros(nbin)
+    for i in range(len(X)):
+        for j in range(nbin):
+            if X[i] >= xaxis[j] and X[i] < xaxis[j+1]:
+                freq[j] = freq[j] + 1
+
+    xout = np.zeros((nbin + 1) * 2)
+    yout = np.zeros((nbin + 1) * 2)
+
+    xout[0] = xaxis[0]
+    yout[0] = 0
+    for i in range(0, nbin):
+        xout[2*i+1] = xaxis[i]
+        xout[2*i+2] = xaxis[i+1]
+        yout[2*i+1] = freq[i]
+        yout[2*i+2] = freq[i]
+    xout[-1] = xaxis[-1]
+    yout[-1] = 0
+
+    return xout, yout, dx
+
+
+
+def histogram_xlog_ysqrt_data(X, tres):
+    """
+    Plot dwell time histogram in log x and square root y.
+    """
+    xout, yout, dx = prepare_xlog_hist(X, tres)
+    fig = plt.figure(figsize=(3,3))
+    ax = fig.add_subplot(111)
+    ax.semilogx(xout, np.sqrt(yout))
+    ax.set_xlabel('Apparent periods')
+    ax.set_ylabel('sqrt(frequency)')
