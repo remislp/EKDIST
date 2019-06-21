@@ -1,4 +1,8 @@
-__version__ = "0.0.5"
+__version__ = "0.0.6"
+
+# Version 0.0.6
+# Released 21/06/2019
+# - ekplot.py: x_log-y_sqrt dwell time histogram refactored 
 
 # Version 0.0.5
 # Released 17/06/2019

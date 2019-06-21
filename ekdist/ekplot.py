@@ -2,6 +2,9 @@ import math
 import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
+from matplotlib import scale as mscale
+from matplotlib import transforms as mtransforms
+from matplotlib import ticker
 
 from ekdist import eklib
 
@@ -52,6 +55,8 @@ def histogram_fitted_amplitudes(rec, fc, n=2, nbins=20, gauss=True):
           format(min(long_opamp), max(long_opamp)))
     return fig   
 
+###############################################################################
+# Dwell time histograms: x-log / y-sqrt
 def __histogram_bins_per_decade(X):
     nbdec = 12
     if (len(X) <= 300): nbdec = 5 
@@ -76,44 +81,63 @@ def prepare_xlog_hist(X, tres):
     dx : float
         Histogram bin width.
     """
-
     dx = math.exp(math.log(10.0) / float(__histogram_bins_per_decade(X))) # bin width
-    xstart = tres    # histogramm starts at
     xend = math.exp(math.ceil(math.log(max(X)))) # round up maximum value
-    nbin = int(math.log(xend / xstart) / math.log(dx))
-    xaxis = tres * np.array([dx**i for i in range(nbin+1)])
-
-    # Sorts data into bins.
-    freq = np.zeros(nbin)
-    for i in range(len(X)):
-        for j in range(nbin):
-            if X[i] >= xaxis[j] and X[i] < xaxis[j+1]:
-                freq[j] = freq[j] + 1
-
-    xout = np.zeros((nbin + 1) * 2)
-    yout = np.zeros((nbin + 1) * 2)
-
-    xout[0] = xaxis[0]
-    yout[0] = 0
-    for i in range(0, nbin):
-        xout[2*i+1] = xaxis[i]
-        xout[2*i+2] = xaxis[i+1]
-        yout[2*i+1] = freq[i]
-        yout[2*i+2] = freq[i]
-    xout[-1] = xaxis[-1]
-    yout[-1] = 0
-
+    nbin = int(math.log(xend / tres) / math.log(dx)) # number of bins
+    my_bins = tres * np.array([dx**i for i in range(nbin+1)])
+    hist, bin_edges = np.histogram(X, bins=my_bins)
+    xout = [x for pair in zip(bin_edges, bin_edges) for x in pair]
+    yout = [0] + [y for pair in zip(hist, hist) for y in pair] + [0]
     return xout, yout, dx
 
-
-
-def histogram_xlog_ysqrt_data(X, tres):
+def histogram_xlog_ysqrt_data(X, tres, xlabel='Dwell times'):
     """
     Plot dwell time histogram in log x and square root y.
     """
     xout, yout, dx = prepare_xlog_hist(X, tres)
     fig = plt.figure(figsize=(3,3))
     ax = fig.add_subplot(111)
-    ax.semilogx(xout, np.sqrt(yout))
-    ax.set_xlabel('Apparent periods')
+    ax.semilogx(xout, yout)
+    mscale.register_scale(SquareRootScale)
+    ax.set_yscale('sqrtscale')
+    ax.set_xlabel(xlabel)
     ax.set_ylabel('sqrt(frequency)')
+
+###############################################################################
+# TODO: Consider moving this class somewhere else.
+class SquareRootScale(mscale.ScaleBase):
+    """ Class for generating square root scaled axis for probability density
+    function plots.
+    https://stackoverflow.com/questions/42277989/square-root-scale-using-matplotlib-python
+    """
+    name = 'sqrtscale'
+    def __init__(self, axis, **kwargs):
+        mscale.ScaleBase.__init__(self)
+    def get_transform(self):
+        """ Set the actual transform for the axis coordinates. """
+        return self.SqrTransform()
+    def set_default_locators_and_formatters(self, axis):
+        """ Set the locators and formatters to reasonable defaults. """
+        axis.set_major_formatter(ticker.ScalarFormatter())
+
+    class SqrTransform(mtransforms.Transform):
+        input_dims, output_dims = 1, 1
+        is_separable = True
+        def __init__(self):
+            mtransforms.Transform.__init__(self)
+        def transform(self, a):
+            """ Take numpy array and return transformed copy. """
+            return np.sqrt(a)
+        def inverted(self):
+            """ Get inverse transform. """
+            return SquareRootScale.InvertedSqrTransform()
+
+    class InvertedSqrTransform(mtransforms.Transform):
+        input_dims, output_dims = 1, 1
+        is_separable = True
+        def __init__(self):
+            mtransforms.Transform.__init__(self)
+        def transform(self, a):
+            return np.power(a, 2)
+        def inverted(self):
+            return SquareRootScale.SqrTransform()
