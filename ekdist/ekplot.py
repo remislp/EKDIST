@@ -64,6 +64,14 @@ def __histogram_bins_per_decade(X):
     if (len(X) > 1000) and (len(X) <= 3000): nbdec = 10
     return nbdec
 
+def __bin_width(X):
+    return math.exp(math.log(10.0) / float(__histogram_bins_per_decade(X)))
+
+def __exponential_scale_factor(X, pars, tres):
+    tau, area = eklib._theta_unsqueeze(pars)
+    return (len(X) * math.log10(__bin_width(X)) * math.log(10) *
+            (1 / np.sum(area * np.exp(-tres / tau))))
+
 def prepare_xlog_hist(X, tres):
     """ Prepare x-log histogram.     
 
@@ -78,23 +86,21 @@ def prepare_xlog_hist(X, tres):
     -------
     xout, yout :  list of scalar
         x and y values to plot histogram.
-    dx : float
-        Histogram bin width.
     """
-    dx = math.exp(math.log(10.0) / float(__histogram_bins_per_decade(X))) # bin width
+    dx = __bin_width(X)
     xend = math.exp(math.ceil(math.log(max(X)))) # round up maximum value
     nbin = int(math.log(xend / tres) / math.log(dx)) # number of bins
     my_bins = tres * np.array([dx**i for i in range(nbin+1)])
     hist, bin_edges = np.histogram(X, bins=my_bins)
     xout = [x for pair in zip(bin_edges, bin_edges) for x in pair]
     yout = [0] + [y for pair in zip(hist, hist) for y in pair] + [0]
-    return xout, yout, dx
+    return xout, yout
 
-def histogram_xlog_ysqrt_data(X, tres, xlabel='Dwell times'):
+def histogram_xlog_ysqrt_data(X, tres, fitpars=None, xlabel='Dwell times'):
     """
     Plot dwell time histogram in log x and square root y.
     """
-    xout, yout, dx = prepare_xlog_hist(X, tres)
+    xout, yout= prepare_xlog_hist(X, tres)
     fig = plt.figure(figsize=(3,3))
     ax = fig.add_subplot(111)
     ax.semilogx(xout, yout)
@@ -102,6 +108,13 @@ def histogram_xlog_ysqrt_data(X, tres, xlabel='Dwell times'):
     ax.set_yscale('sqrtscale')
     ax.set_xlabel(xlabel)
     ax.set_ylabel('sqrt(frequency)')
+    if fitpars is not None:
+        scale = __exponential_scale_factor(X, fitpars, tres)
+        t = np.logspace(math.log10(tres), math.log10(2 * max(X)), 512)
+        ax.plot(t, scale * t * eklib.myexp(fitpars, t), '-b')
+        tau, area = eklib._theta_unsqueeze(fitpars)
+        for ta, ar in zip(tau, area):
+            ax.plot(t, scale * t * (ar / ta) * np.exp(-t / ta), '--b')
 
 ###############################################################################
 # TODO: Consider moving this class somewhere else.

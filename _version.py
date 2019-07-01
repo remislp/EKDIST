@@ -1,4 +1,10 @@
-__version__ = "0.0.6"
+__version__ = "0.0.7"
+
+# Version 0.0.7
+# Released 01/07/2019
+# - eklib.py: fitting multiple exponential pdf
+# - ekplot.py: overlay histogram with fitted pdf
+# - EKDIST_example notebook updated
 
 # Version 0.0.6
 # Released 21/06/2019
