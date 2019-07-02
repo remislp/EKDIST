@@ -18,6 +18,18 @@ class SingleChannelRecord(object):
         self.record_type = None
         
         self.badopen=-1
+
+    def load_intervals_from_list(self, intervals, amplitudes, flags=None):
+        self.itint, self.iampl = intervals, amplitudes
+        if flags is not None:
+            self.iprop = flags
+        else:
+            self.iprop = np.array([0] * len(intervals))
+        self.origin = "Intervals loaded from list"
+        self.is_loaded = True
+        self._tres = 0.0
+        self.rtint, self.rampl, self.rprop = self.itint, self.iampl, self.iprop
+        self._set_periods()
             
     def load_SCN_file(self, infiles):
         """Load shut and open intervals from SCN file."""
@@ -105,7 +117,7 @@ class SingleChannelRecord(object):
         """
 
         # Find negative intervals and set them unusable
-        self.iprop[self.itint < 0] = 8
+        self.iprop[np.where(self.itint < 0.0)] = 8
         # Find first resolvable and usable interval.
         n = np.intersect1d(np.where(self.itint > self._tres),
             np.where(self.iprop < 8))[0]
@@ -289,211 +301,89 @@ class SingleChannelRecord(object):
         self.shpro = self.pprop[1::2]
 
 
-    def get_bursts(self, tcrit):
-        """
-        Cut entire single channel record into clusters using critical shut time
+class Bursts(object):
+    """   """
+    def __init__(self, intervals, amplitudes, flags=None, tcrit=None):
+        self.t, self.a = np.array(intervals), np.array(amplitudes)
+        self.bursts = None
+        if flags is not None:
+            self.o = flags
+        else:
+            self.o = np.zeros(len(intervals))
+
+    def slice_bursts(self, tcrit):
+        """Cut entire single channel record into clusters using critical shut time
         interval (tcrit).
         Default definition of cluster:
         (1) Doesn't require a gap > tcrit before the 1st cluster in each record;
         (2) Unusable shut time is a valid end of cluster;
         (3) Open probability of a cluster is calculated without considering
-        last opening.
-        """
-        
-        tcrit = math.fabs(tcrit)
-        bursts = Bursts(tcrit)
-        burst = Burst()
-        i = 0
-        badend = False
-        while i < (len(self.ptint) - 1):
-            if self.pampl[i] != 0:
-                if not badend:
-                    if self.pprop[i] < 8:
-                        burst.add_interval(self.ptint[i], self.pampl[i])
-                    else:
-                        badend = True
-            else: # found gap
-                if ((self.ptint[i] < tcrit) and (self.pprop[i] < 8)):
-                    if not badend:
-                        burst.add_interval(self.ptint[i], self.pampl[i])
-#                elif self.pint[i] >= tcrit and self.popt[i] < 8:
-                else:
-                    if ((burst.get_openings_number() > 0) and 
-                        (burst.get_openings_number() * 2 == len(burst.intervals) + 1) 
-                        and (not badend)):
-                        bursts.add_burst(burst)
-                    burst = Burst()
-                    badend = False
-#                elif self.popt[i] >= 8:
-#                    badend = True
-            i += 1
-        if self.pampl[i] != 0:
-            burst.add_interval(self.ptint[i], self.pampl[i])
-            bursts.add_burst(burst)
-        if burst.intervals and not badend:
-            bursts.add_burst(burst)
-        return bursts
+        last opening. """
 
-class Burst(object):
-    """   """
-    def __init__(self):
-        self.setup()
+        self.tcrit = tcrit
+        long_shuts = np.intersect1d(np.where(self.t > tcrit),
+                                    np.where(self.a == 0.0))
+        groups = np.split(self.t, long_shuts)
+        #amplitudes = np.split(self.t, long_shuts)
+        #bamps = [amplitudes[0]] + [np.delete(a, 0) for a in amplitudes[1:]]
+        self.bursts = [groups[0]] + [np.delete(a, 0) for a in groups[1:]]
+    
+    def get_burst_total_open_time(self, burst):
+        return np.sum(burst[0::2])
 
-    def setup(self):
-        self.intervals = []
-        self.amplitudes = []
-
-    def add_interval(self, interval, amplitude):
-        self.intervals.append(interval)
-        self.amplitudes.append(amplitude)
-
-    def concatenate_last(self, interval, amplitude):
-        try:
-            self.intervals[-1] += interval
-        except:
-            self.intervals.append(interval)
-            self.amplitudes.append(amplitude)
-
-    def get_open_intervals(self):
-        return self.intervals[0::2]
-
-    def get_shut_intervals(self):
-        return self.intervals[1::2]
-
-    def get_mean_amplitude(self):
-        return np.average(self.amplitudes[0::2])
-
-    def get_openings_number(self):
-        return len(self.get_open_intervals())
-
-    def get_openings_average_length(self):
-        return np.average(self.get_open_intervals())
-
-    def get_shuttings_average_length(self):
-        return np.average(self.get_shut_intervals())
-
-    def get_total_open_time(self):
-        return np.sum(self.get_open_intervals())
-
-    def get_total_shut_time(self):
-        return np.sum(self.get_shut_intervals())
-
-    def get_length(self):
-        return np.sum(self.intervals)
-
-    def get_popen(self):
-        """ Calculate burst Popen. """
-        return self.get_total_open_time() / np.sum(self.intervals)
-
-    def get_popen1(self):
+    def get_burst_popen1(self, burst):
         """ Calculate Popen by excluding very last opening. Equal number of open
         and shut intervals are taken into account. """
-        if len(self.intervals) > 1:
-            return ((self.get_total_open_time() - self.intervals[-1]) /
-                np.sum(self.intervals[:-1]))
+        if len(burst) > 1:
+            return ((self.get_burst_total_open_time(burst) - burst[-1]) /
+                np.sum(burst[:-1]))
         else:
             return 1.0
 
-    def get_running_mean_popen(self, N):
-        if len(self.intervals)-1 > 2*N:
-            openings = self.get_open_intervals()
-            shuttings = self.get_shut_intervals()
-            meanP = []
-            for i in range(len(openings) - N):
-                meanP.append(np.sum(openings[i: i+N]) /
-                    (np.sum(openings[i: i+N]) + np.sum(shuttings[i: i+N])))
-            return meanP
-        else:
-            return self.get_popen()
+    def get_burst_popen(self, burst):
+        """ Calculate burst Popen. """
+        return self.get_burst_total_open_time(burst) / np.sum(burst)
 
-    def __repr__(self):
-        ret_str = ('Group length = {0:.3f} ms; '.
-            format(self.get_length() * 1000) +
-            'number of openings = {0:d}; '.format(self.get_openings_number()) +
-            'Popen = {0:.3f}'.format(self.get_popen()))
-        if self.get_openings_number() > 1:
-            ret_str += ('\n\t(Popen omitting last opening = {0:.3f})'.
-            format(self.get_popen1()))
-        ret_str += ('\n\tTotal open = {0:.3f} ms; total shut = {1:.3f} ms'.
-            format(self.get_total_open_time() * 1000,
-            self.get_total_shut_time() * 1000))
-        return ret_str
+    def get_list_popen(self):
+        return [self.get_burst_popen1(b) for b in self.bursts]
 
-class Bursts(object):
-    """   """
-    def __init__(self, tcrit):
-        self.tcrit = tcrit
-        self.bursts = []
-    def add_burst(self, burst):
-        self.bursts.append(burst)
+    def get_list_length(self):
+        return [np.sum(b) for b in self.bursts]
 
-    def intervals(self):
-        """ Get all intervals in the record. """
-        return [b.intervals for b in self.bursts]
+    def get_list_number_openings(self):
+        return [len(b[0::2]) for b in self.bursts]
 
-    def get_op_lists(self):
-        list = []
-        for b in self.bursts:
-            list.append(b.get_open_intervals())
-        return list
+    def get_list_mean_opening_length(self):
+        return [np.average(b[0::2]) for b in self.bursts]
 
-    def get_sh_lists(self):
-        list = []
-        for b in self.bursts:
-            list.append(b.get_shut_intervals())
-        return list
+    def get_list_total_open_time(self):
+        return [np.sum(b[0::2]) for b in self.bursts]
 
-    def all(self):
-        return self.bursts
+    def get_list_total_shut_time(self):
+        return [np.sum(b[1::2]) for b in self.bursts if len(b)>1]
 
-    def count(self):
-        return len(self.bursts)
-
-    def get_length_list(self):
-        return [b.get_length() for b in self.bursts]
-
-    def get_length_mean(self):
-        return np.average(self.get_length_list())
-
-    def get_opening_num_list(self):
-        return [b.get_openings_number() for b in self.bursts]
-
-    def get_opening_num_mean(self):
-        return np.average(self.get_opening_num_list())
-
-    def get_opening_length_mean_list(self):
-        return [np.average(b.get_open_intervals()) for b in self.bursts]
-    
-    def get_popen_list(self):
-        return [b.get_popen1() for b in self.bursts]
-
-    def get_mean_ampl_list(self):
-        return [b.get_mean_amplitude() for b in self.bursts]
-    
-    def get_popen_mean(self):
-        Popen = self.get_popen_list()
+    def get_mean_popen(self):
+        Popen = self.get_list_popen()
         return np.average([x for x in Popen if str(x) != 'nan'])
 
-    def get_long(self, minop):
-        long = Bursts(self.tcrit)
-        for b in self.bursts:
-            if b.get_openings_number() >= minop:
-                long.add_burst(b)
-        return long
-    
-    def remove_long_open_times(self, top):
+    def get_mean_number_openings(self):
+        return np.average(self.get_list_number_openings())
+
+    def get_mean_length(self):
+        return np.average(self.get_list_length())
+
+    def get_bursts_with_opening_number(self, k):
+        return [b for b in self.bursts if len(b[0::2]) == k]
+
+    def remove_bursts_with_long_open_times(self, longop):
         """ Remove bursts which contain open intervals longer than specified 
         value. """
-        cleaned = Bursts(self.tcrit)
-        for b in self.bursts:
-            if max(b.get_open_intervals()) <= top:
-                cleaned.add_burst(b)
-        return [b.intervals for b in cleaned.bursts]
+        return [b for b in self.bursts if b[0::2].any <= longop]
 
     def __repr__(self):
         ret_str = ('tcrit= {0:.3f} ms; number of bursts = {1:d}; '.
             format(self.tcrit * 1000, len(self.bursts)) +
-            '\nmean length = {0:.6g} ms; '.format(self.get_length_mean() *1000) +
-            '\nmean Popen = {0:.3f}'.format(self.get_popen_mean()) +
-            '\nmean number of openings = {0:.2f}'.format(self.get_opening_num_mean()))
+            '\nmean length = {0:.6g} ms; '.format(self.get_mean_length() * 1000) +
+            '\nmean Popen = {0:.3f}'.format(self.get_mean_popen()) +
+            '\nmean number of openings = {0:.2f}'.format(self.get_mean_number_openings()))
         return ret_str

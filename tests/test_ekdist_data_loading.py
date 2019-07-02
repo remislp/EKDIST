@@ -1,6 +1,8 @@
 import os
+import numpy as np
 
 from ekdist import ekscn
+from ekdist import ekrecord
 
 class TestSCNFileLoading:
     def setUp(self):
@@ -32,4 +34,36 @@ class TestSCNFileLoading:
         self.header = None
         self.itint, self.iampl, self.iprops = None, None, None
         
+class TestIntervalListLoading:
+    def setUp(self):
+        self.intervals = [20.0, 1.0, 19.0, 100.0, 10.0, 100.0, 1.0]
+        self.amplitudes = [5.0, 0.0, 5.0, 0.0, 5.0, 0.0, 5.0]
+        self.rec = ekrecord.SingleChannelRecord()
+        self.rec.load_intervals_from_list(np.array(self.intervals), np.array(self.amplitudes))
 
+    def test_original_number_intervals(self):
+        assert len(self.rec.itint) == 7
+        assert len(self.rec.iampl) == 7
+        assert len(self.rec.iprop) == 7
+
+    def test_imposing_resolution(self):
+        self.rec.tres = 2.0
+        assert len(self.rec.rtint) == 4
+        assert len(self.rec.rampl) == 4
+        assert len(self.rec.rprop) == 4
+
+    def test_setting_periods(self):
+        self.rec.tres = 2.0
+        assert len(self.rec.ptint) == 3
+        assert len(self.rec.pampl) == 3
+        assert len(self.rec.pprop) == 3 
+
+    def test_burst_number(self):
+        self.rec.tres = 2.0
+        br = ekrecord.Bursts(self.rec.ptint, self.rec.pampl)
+        br.slice_bursts(50.0)
+        assert len(br.bursts) == 2 
+
+    def tearDown(self):
+        self.intervals, self.amplitudes = None, None
+        self.rec = None

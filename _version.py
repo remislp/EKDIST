@@ -1,4 +1,10 @@
-__version__ = "0.0.8"
+__version__ = "0.0.9"
+
+# Version 0.0.
+# Released 02/07/2019
+# - ekrecord.py: refactored bursts slicing
+# - EKDIST_example notebook updated
+# - tests on imposing resolution andbursts slicing 
 
 # Version 0.0.8
 # Released 02/07/2019
