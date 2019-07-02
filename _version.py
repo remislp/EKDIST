@@ -1,4 +1,9 @@
-__version__ = "0.0.7"
+__version__ = "0.0.8"
+
+# Version 0.0.8
+# Released 02/07/2019
+# - ekrecord.py: slicing single channel record into bursts
+# - EKDIST_example notebook updated
 
 # Version 0.0.7
 # Released 01/07/2019
