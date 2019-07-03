@@ -1,6 +1,6 @@
 import math
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import minimize, bisect
 
 def moving_average(x, n):
     """ Compute an n period moving average. """
@@ -27,6 +27,93 @@ def amplitudes_openings_longer_Tr(rec, fc, n=2):
     #long_ops = all_resolved_ops[np.where( all_resolved_ops > filter_risetime(fc))]
     long_opamp = all_resolved_opamp[np.where( all_resolved_ops > n * filter_risetime(fc))]
     return np.absolute(long_opamp)
+
+##### finding tcrit between exponentials ######################################
+
+def expPDF_misclassified(tcrit, tau, area, comp):
+    """ Calculate number and fraction of misclassified events after division into
+    bursts by critical time, tcrit. """
+    tfast, tslow = tau[:comp], tau[comp:]
+    afast, aslow = area[:comp], area[comp:]
+    # Number of misclassified.
+    enf = np.sum(afast * np.exp(-tcrit / tfast))
+    ens = np.sum(aslow * (1 - np.exp(-tcrit / tslow)))
+    # Fraction misclassified.
+    pf = enf / np.sum(afast)
+    ps = ens / np.sum(aslow)
+    return enf, ens, pf, ps
+
+def expPDF_tcrit_DC(tcrit, tau, area, comp):
+    """ """
+    _, _, pf, ps = expPDF_misclassified(tcrit, tau, area, comp)
+    return ps - pf
+
+def expPDF_tcrit_CN(tcrit, tau, area, comp):
+    """ """
+    enf, ens, _, _ = expPDF_misclassified(tcrit, tau, area, comp)
+    return ens - enf
+
+def expPDF_tcrit_Jackson(tcrit, tau, area, comp):
+    """ """
+    tfast, tslow = tau[:comp], tau[comp:]
+    afast, aslow = area[:comp], area[comp:]
+    # Number of misclassified.
+    enf = np.sum((afast / tfast) * np.exp(-tcrit / tfast))
+    ens = np.sum((aslow / tslow) * np.exp(-tcrit / tslow))
+    return enf - ens
+
+def expPDF_misclassified_printout(tcrit, enf, ens, pf, ps):
+    """ """
+    return ('tcrit = {0:.5g} ms\n'.format(tcrit * 1000) +
+        '% misclassified: short = {0:.5g};'.format(pf * 100) +
+        ' long = {0:.5g}\n'.format(ps * 100) +
+        '# misclassified (out of 100): short = {0:.5g};'.format(enf * 100) +
+        ' long = {0:.5g}\n'.format(ens * 100) +
+        'Total # misclassified (out of 100) = {0:.5g}\n'
+        .format((enf + ens) * 100))
+
+def get_tcrits(pars):
+    tau, area = _theta_unsqueeze(pars)
+    tcrits = np.empty((3, len(tau)-1))
+    for i in range(len(tau)-1):
+        print('\nCritical time between components {0:d} and {1:d}\n'.
+                format(i+1, i+2) + '\nEqual % misclassified (DC criterion)')
+        try:
+            tcrit = bisect(expPDF_tcrit_DC, tau[i], tau[i+1], args=(tau, area, i+1))
+            enf, ens, pf, ps = expPDF_misclassified(tcrit, tau, area, i+1)
+            print(expPDF_misclassified_printout(tcrit, enf, ens, pf, ps))
+        except:
+            print('Bisection with DC criterion failed.\n')
+            tcrit = None
+        tcrits[0, i] = tcrit
+        
+        print('Equal # misclassified (Clapham & Neher criterion)')
+        try:
+            tcrit = bisect(expPDF_tcrit_CN, tau[i], tau[i+1], args=(tau, area, i+1))
+            enf, ens, pf, ps = expPDF_misclassified(tcrit, tau, area, i+1)
+            print(expPDF_misclassified_printout(tcrit, enf, ens, pf, ps))
+        except:
+            print('Bisection with Clapham & Neher criterion failed.\n')
+            tcrit = None
+        tcrits[1, i] = tcrit
+            
+        print('Minimum total # misclassified (Jackson et al criterion)')
+        try:
+            tcrit = bisect(expPDF_tcrit_Jackson, tau[i], tau[i+1], args=(tau, area, i+1))
+            enf, ens, pf, ps = expPDF_misclassified(tcrit, tau, area, i+1)
+            print(expPDF_misclassified_printout(tcrit, enf, ens, pf, ps))
+        except:
+            print('\nBisection with Jackson et al criterion failed.')
+            tcrit = None
+        tcrits[2, i] = tcrit
+        
+    print('\n\nSUMMARY of tcrit values:\nComponents\t\tDC\t\tC&N\t\tJackson\n')
+    for i in range(len(tau)-1):
+        print('{0:d} to {1:d} '.format(i+1, i+2) +
+                '\t\t\t{0:.5g}'.format(tcrits[0, i] * 1000) +
+                '\t\t{0:.5g}'.format(tcrits[1, i] * 1000) +
+                '\t\t{0:.5g}\n'.format(tcrits[2, i] * 1000))
+    return tcrits
 
 ##### fitting exponential pdf's ###############################################
 def myexp(theta, X):

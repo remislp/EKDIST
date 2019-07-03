@@ -96,61 +96,21 @@ def prepare_xlog_hist(X, tres):
     yout = [0] + [y for pair in zip(hist, hist) for y in pair] + [0]
     return xout, yout
 
-def histogram_xlog_ysqrt_data(X, tres, fitpars=None, xlabel='Dwell times'):
-    """
-    Plot dwell time histogram in log x and square root y.
-    """
+def histogram_xlog_ysqrt_data(X, tres, fitpars=None, tcrit=None, xlabel='Dwell times'):
+    """ Plot dwell time histogram in log x and square root y. """
     xout, yout= prepare_xlog_hist(X, tres)
     fig = plt.figure(figsize=(3,3))
     ax = fig.add_subplot(111)
-    ax.semilogx(xout, yout)
-    mscale.register_scale(SquareRootScale)
-    ax.set_yscale('sqrtscale')
+    ax.semilogx(xout, np.sqrt(yout))
     ax.set_xlabel(xlabel)
     ax.set_ylabel('sqrt(frequency)')
     if fitpars is not None:
         scale = __exponential_scale_factor(X, fitpars, tres)
         t = np.logspace(math.log10(tres), math.log10(2 * max(X)), 512)
-        ax.plot(t, scale * t * eklib.myexp(fitpars, t), '-b')
+        ax.plot(t, np.sqrt(scale * t * eklib.myexp(fitpars, t)), '-b')
         tau, area = eklib._theta_unsqueeze(fitpars)
         for ta, ar in zip(tau, area):
-            ax.plot(t, scale * t * (ar / ta) * np.exp(-t / ta), '--b')
-
-###############################################################################
-# TODO: Consider moving this class somewhere else.
-class SquareRootScale(mscale.ScaleBase):
-    """ Class for generating square root scaled axis for probability density
-    function plots.
-    https://stackoverflow.com/questions/42277989/square-root-scale-using-matplotlib-python
-    """
-    name = 'sqrtscale'
-    def __init__(self, axis, **kwargs):
-        mscale.ScaleBase.__init__(self)
-    def get_transform(self):
-        """ Set the actual transform for the axis coordinates. """
-        return self.SqrTransform()
-    def set_default_locators_and_formatters(self, axis):
-        """ Set the locators and formatters to reasonable defaults. """
-        axis.set_major_formatter(ticker.ScalarFormatter())
-
-    class SqrTransform(mtransforms.Transform):
-        input_dims, output_dims = 1, 1
-        is_separable = True
-        def __init__(self):
-            mtransforms.Transform.__init__(self)
-        def transform(self, a):
-            """ Take numpy array and return transformed copy. """
-            return np.sqrt(a)
-        def inverted(self):
-            """ Get inverse transform. """
-            return SquareRootScale.InvertedSqrTransform()
-
-    class InvertedSqrTransform(mtransforms.Transform):
-        input_dims, output_dims = 1, 1
-        is_separable = True
-        def __init__(self):
-            mtransforms.Transform.__init__(self)
-        def transform(self, a):
-            return np.power(a, 2)
-        def inverted(self):
-            return SquareRootScale.SqrTransform()
+            ax.plot(t, np.sqrt(scale * t * (ar / ta) * np.exp(-t / ta)), '--b')
+    if tcrit is not None:
+        for tc in np.asarray(tcrit):
+            ax.axvline(x=tc, color='g')

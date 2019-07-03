@@ -1,10 +1,16 @@
-__version__ = "0.0.9"
+__version__ = "0.0.10"
 
-# Version 0.0.
+# Version 0.0.10
+# Released 03/07/2019
+# - eklib.py: calculating tcrits between two exponentials
+# - ekplot.py: sqrt scale transform abandoned
+# - EKDIST_example notebook updated
+
+# Version 0.0.9
 # Released 02/07/2019
 # - ekrecord.py: refactored bursts slicing
 # - EKDIST_example notebook updated
-# - tests on imposing resolution andbursts slicing 
+# - tests on imposing resolution and bursts slicing 
 
 # Version 0.0.8
 # Released 02/07/2019
