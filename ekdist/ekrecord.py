@@ -221,84 +221,77 @@ class SingleChannelRecord(object):
                 rampl.append(atemp / ttemp)
         else:
             rampl.append(0)
-            
-        
-
         self.rtint, self.rampl, self.rprop = rtint, rampl, rprops
 
     def _set_periods(self):
-        """
-        Separate open and shut intervals from the entire record.
-        There may be many small amplitude transitions during one opening,
-        each of which will count as an individual opening, so generally
-        better to look at 'open periods'.
-        Look for start of a group of openings i.e. any opening that has
-        defined duration (i.e. usable).  A single unusable opening in a group
-        makes its length undefined so it is excluded.
-        NEW VERSION -ENSURES EACH OPEN PERIOD STARTS WITH SHUT-OPEN TRANSITION
-        Find start of a group (open period) -valid start must have a good shut
-        time followed by a good opening -if a bad opening is found as first (or
-        any later) opening then the open period is abandoned altogether, and the
-        next good shut time sought as start for next open period, but for the
-        purposes of identifying the nth open period, rejected ones must be counted
-        as an open period even though their length is undefined.
-        """
+        self.periods = Periods(self.rtint, self.rampl, self.rprop)
+        self.ptint, self.pampl, self.pprop = self.periods.all()
+        self.opint, self.opamp, self.oppro = self.periods.open()
+        self.shint, self.shamp, self.shpro = self.periods.shut()
 
-        pint, pamp, popt = [], [], []
+
+class Periods:
+    """ """
+    def __init__(self, intervals, amplitudes, flags=None):
+        self.rtint, self.rampl = intervals, amplitudes
+        if flags is not None:
+            self.rprop = flags
+        else:
+            self.rprop = np.zeros(len(intervals))
+        self.ptint, self.pampl, self.pprop = [], [], []
+        self._set_periods()
+        
+    def _set_periods(self):
+        """ Separate the entire record into periods when channel is open or shut.
+        There may be many amplitude transitions during one opening, each of 
+        which will count as an individual opening, so generally better to
+        look at 'open periods'. """
+        
         # Remove first and last intervals if shut
-        if self.rampl[0] == 0:
+        while self.rampl[0] == 0:
             self.rtint = self.rtint[1:]
             self.rampl = self.rampl[1:]
             self.rprop = self.rprop[1:]
-        if self.rtint[-1] < 0:
-            self.rtint = self.rtint[:-1]
-            self.rampl = self.rampl[:-1]
-            self.rprop = self.rprop[:-1]
-        while self.rampl[-1] == 0:
+        while (self.rtint[-1] < 0) or (self.rampl[-1] == 0):
             self.rtint = self.rtint[:-1]
             self.rampl = self.rampl[:-1]
             self.rprop = self.rprop[:-1]
 
         oint, oamp, oopt = self.rtint[0], self.rampl[0] * self.rtint[0], self.rprop[0]
-        n = 1
-        while n < len(self.rtint):
-            if self.rampl[n] != 0:
-                oint += self.rtint[n]
-                oamp += self.rampl[n] * self.rtint[n]
-                if self.rprop[n] >= 8: oopt = 8
-
-                if n == (len(self.rtint) - 1):
-                    pamp.append(oamp/oint)
-                    pint.append(oint)
-                    popt.append(oopt)
+        for t, a, o in zip(self.rtint[1 : ], self.rampl[1 : ], self.rprop[1 : ]):
+            if o >= 8: oopt = 8
+            condition_both_open = ((math.fabs(a) > 0.0) and (math.fabs(oamp) > 0.0))
+            condition_both_shut = ((a == 0.0) and (oamp == 0.0))
+            if condition_both_open or condition_both_shut:
+                oint += t
+                oamp += a * t
             else:
-                # found two consequent gaps
-                if oamp == 0 and self.rampl[n] == 0 and oopt < 8:
-                    pint[-1] += self.rtint[n]
-                # skip bad opening
-                #elif (self.badopen > 0 and oint > self.badopen) or (oopt >= 8):
-                elif (oopt >= 8):
-                    popt[-1] = 8
-                    oint, oamp, oopt = 0.0, 0.0, 0
-#                    if n != (len(self.rint) - 2):
-#                        n += 1
-                else: # shutting terminates good opening
-                    pamp.append(oamp/oint)
-                    pint.append(oint)
-                    popt.append(oopt)
-                    oint, oamp, oopt = 0.0, 0.0, 0
-                    pamp.append(0.0)
-                    pint.append(self.rtint[n])
-                    popt.append(self.rprop[n])
-            n += 1
+                try:
+                    self.pampl.append(oamp / oint)
+                except:
+                    self.pampl.append(oamp)
+                self.ptint.append(oint)
+                self.pprop.append(oopt)
+                oint, oamp, oopt = t, a, o
+        # append last period
+        try:
+            self.pampl.append(oamp / oint)
+        except:
+            self.pampl.append(oamp)
+        self.ptint.append(oint)
+        self.pprop.append(oopt)
 
-        self.ptint, self.pampl, self.pprop = pint, pamp, popt
-        self.opint = self.ptint[0::2]
-        self.opamp = self.pampl[0::2]
-        self.oppro = self.pprop[0::2]
-        self.shint = self.ptint[1::2]
-        self.shamp = self.pampl[1::2]
-        self.shpro = self.pprop[1::2]
+    def open(self):
+        # TODO: remove bad intervals befor returning
+        return self.ptint[0::2], self.pampl[0::2], self.pprop[0::2]
+
+    def shut(self):
+        # TODO: remove bad intervals befor returning
+        return self.ptint[1::2], self.pampl[1::2], self.pprop[1::2]
+
+    def all(self):
+        # TODO: remove bad intervals befor returning
+        return self.ptint, self.pampl, self.pprop
 
 
 class Bursts(object):

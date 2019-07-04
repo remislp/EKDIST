@@ -1,4 +1,8 @@
-__version__ = "0.0.10"
+__version__ = "0.0.11"
+
+# Version 0.0.11
+# Released 04/07/2019
+# - ekrecord.py: refactored period setting
 
 # Version 0.0.10
 # Released 03/07/2019

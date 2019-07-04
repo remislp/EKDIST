@@ -48,19 +48,21 @@ class TestIntervalListLoading:
 
     def test_imposing_resolution(self):
         self.rec.tres = 2.0
-        assert len(self.rec.rtint) == 4
-        assert len(self.rec.rampl) == 4
-        assert len(self.rec.rprop) == 4
+        assert len(self.rec.rtint) == 5
+        assert len(self.rec.rampl) == 5
+        assert len(self.rec.rprop) == 5
 
     def test_setting_periods(self):
         self.rec.tres = 2.0
-        assert len(self.rec.ptint) == 3
-        assert len(self.rec.pampl) == 3
-        assert len(self.rec.pprop) == 3 
+        per = ekrecord.Periods(self.rec.rtint, self.rec.rampl, self.rec.rprop)
+        assert len(per.ptint) == 3
+        assert len(per.pampl) == 3
+        assert len(per.pprop) == 3 
 
     def test_burst_number(self):
         self.rec.tres = 2.0
-        br = ekrecord.Bursts(self.rec.ptint, self.rec.pampl)
+        per = ekrecord.Periods(self.rec.rtint, self.rec.rampl, self.rec.rprop)
+        br = ekrecord.Bursts(per.ptint, per.pampl)
         br.slice_bursts(50.0)
         assert len(br.bursts) == 2 
 
