@@ -1,4 +1,11 @@
-__version__ = "0.0.11"
+__version__ = "0.0.12"
+
+# Version 0.0.12
+# Released 10/07/2019
+# - ekrecord.py: refactoring namespace in Periods class;
+#                get open/shut intervals in a specified range 
+# - ekplot.py: added openings per burst plot
+# - tests and notebooks updated
 
 # Version 0.0.11
 # Released 04/07/2019

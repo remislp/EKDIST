@@ -58,6 +58,17 @@ def histogram_fitted_amplitudes(rec, fc, n=2, nbins=20, gauss=True):
           format(min(long_opamp), max(long_opamp)))
     return fig   
 
+def burst_number_of_openings(nops):
+    """ nops- list of number of openings  """
+    fig = plt.figure(figsize=(12,3))
+    ax = fig.add_subplot(111)
+    bins = np.arange(0., max(nops)+1, 1)
+    ax.hist(nops, bins, histtype='step')
+    ax.set_xlim([0, 1 + max(bins)])
+    ax.set_xlabel('# of openings / burst')
+    ax.set_ylabel('Frequency')
+    return fig
+
 ###############################################################################
 # Dwell time histograms: x-log / y-sqrt
 def __histogram_bins_per_decade(X):

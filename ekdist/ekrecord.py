@@ -276,10 +276,18 @@ class Periods:
                 oint, oamp, oopt = t, a, o
         self.__append_period_to_list(oint, oamp, oopt) # append last period
 
-    def get_open_intervals(self):
+    def get_open_intervals(self, in_range=None):
+        if in_range is not None:
+            all_op_int = np.asarray(self.intervals[0::2])
+            longer_ints = all_op_int[np.where(all_op_int >= in_range[0])]
+            return longer_ints[np.where(longer_ints <= in_range[1])]
         return self.intervals[0::2]
 
-    def get_shut_intervals(self):
+    def get_shut_intervals(self, in_range=None):
+        if in_range is not None:
+            all_sh_int = np.asarray(self.intervals[1::2])
+            longer_ints = all_sh_int[np.where(all_sh_int >= in_range[0])]
+            return longer_ints[np.where(longer_ints <= in_range[1])]
         return self.intervals[1::2]
 
 
