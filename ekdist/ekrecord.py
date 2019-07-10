@@ -222,6 +222,21 @@ class SingleChannelRecord(object):
         else:
             rampl.append(0)
         self.rtint, self.rampl, self.rprop = rtint, rampl, rprops
+        self.__remove_first_interval_if_shut()
+        self.__remove_last_interval_if_shut_or_bad()
+
+    def __remove_first_interval_if_shut(self):
+        # Remove first and last intervals if shut
+        while self.rampl[0] == 0:
+            self.rtint = self.rtint[1:]
+            self.rampl = self.rampl[1:]
+            self.rprop = self.rprop[1:]
+
+    def __remove_last_interval_if_shut_or_bad(self):
+        while (self.rtint[-1] < 0) or (self.rampl[-1] == 0):
+            self.rtint = self.rtint[:-1]
+            self.rampl = self.rampl[:-1]
+            self.rprop = self.rprop[:-1]
 
     def _set_periods(self):
         self.periods = Periods(self.rtint, self.rampl, self.rprop)
@@ -233,28 +248,9 @@ class SingleChannelRecord(object):
 class Periods:
     """ """
     def __init__(self, rintervals, ramplitudes, rflags=None):
-        self.rtint, self.rampl = rintervals, ramplitudes
-        if rflags is not None:
-            self.rprop = rflags
-        else:
-            self.rprop = np.zeros(len(rintervals))
-        self.__remove_first_interval_if_shut()
-        self.__remove_last_interval_if_shut()
+        rprops = rflags if rflags is not None else np.zeros(len(rintervals))
         self.ptint, self.pampl, self.pprop = [], [], []
-        self._set_periods()
-
-    def __remove_first_interval_if_shut(self):
-        # Remove first and last intervals if shut
-        while self.rampl[0] == 0:
-            self.rtint = self.rtint[1:]
-            self.rampl = self.rampl[1:]
-            self.rprop = self.rprop[1:]
-
-    def __remove_last_interval_if_shut(self):
-        while (self.rtint[-1] < 0) or (self.rampl[-1] == 0):
-            self.rtint = self.rtint[:-1]
-            self.rampl = self.rampl[:-1]
-            self.rprop = self.rprop[:-1]
+        self._set_periods(rintervals, ramplitudes, rprops)
 
     def __append_period_to_list(self, oint, oamp, oopt):
         try:
@@ -264,14 +260,14 @@ class Periods:
         self.ptint.append(oint)
         self.pprop.append(oopt)
 
-    def _set_periods(self):
+    def _set_periods(self, rintervals, ramplitudes, rprops):
         """ Separate the entire record into periods when channel is open or shut.
         There may be many amplitude transitions during one opening, each of 
         which will count as an individual opening, so generally better to
         look at 'open periods'. """
         
-        oint, oamp, oopt = self.rtint[0], self.rampl[0] * self.rtint[0], self.rprop[0]
-        for t, a, o in zip(self.rtint[1 : ], self.rampl[1 : ], self.rprop[1 : ]):
+        oint, oamp, oopt = rintervals[0], ramplitudes[0] * rintervals[0], rprops[0]
+        for t, a, o in zip(rintervals[1 : ], ramplitudes[1 : ], rprops[1 : ]):
             if o >= 8: oopt = 8
             condition_both_open = ((math.fabs(a) > 0.0) and (math.fabs(oamp) > 0.0))
             condition_both_shut = ((a == 0.0) and (oamp == 0.0))
@@ -281,8 +277,7 @@ class Periods:
             else:
                 self.__append_period_to_list(oint, oamp, oopt)
                 oint, oamp, oopt = t, a, o
-        # append last period
-        self.__append_period_to_list(oint, oamp, oopt)
+        self.__append_period_to_list(oint, oamp, oopt) # append last period
 
     def open(self):
         # TODO: remove bad intervals befor returning

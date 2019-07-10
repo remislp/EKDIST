@@ -48,9 +48,9 @@ class TestIntervalListLoading:
 
     def test_imposing_resolution(self):
         self.rec.tres = 2.0
-        assert len(self.rec.rtint) == 5
-        assert len(self.rec.rampl) == 5
-        assert len(self.rec.rprop) == 5
+        assert len(self.rec.rtint) == 4
+        assert len(self.rec.rampl) == 4
+        assert len(self.rec.rprop) == 4
 
     def test_setting_periods(self):
         self.rec.tres = 2.0
