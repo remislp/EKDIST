@@ -21,7 +21,7 @@ class TestFunctional:
         assert len(self.rec.itint)-1 > len(self.rec.rtint)
 
     def test_periods_set(self):
-        assert len(self.rec.rtint) > len(self.rec.ptint)
+        assert len(self.rec.rtint) > len(self.rec.periods.intervals)
         
 # Intervals can be: 
 # (1) loaded from a file;

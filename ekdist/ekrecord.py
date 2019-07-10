@@ -67,25 +67,24 @@ class SingleChannelRecord(object):
         if not self.is_loaded:
             str_repr = "Empty record" 
         else:
+            openings = self.periods.get_open_intervals()
+            shuttings = self.periods.get_shut_intervals()
             str_repr = self.origin
-            str_repr += "\nTotal number of intervals = {0:d}".format(
-                len(self.itint))
+            str_repr += "\nTotal number of intervals = {0:d}".format(len(self.itint))
             str_repr += ('\nResolution for HJC calculations = ' + 
                 '{0:.1f} microseconds'.format(self._tres*1e6))
-            str_repr += "\nNumber of resolved intervals = {0:d}".format(
-                len(self.rtint))
-            str_repr += "\nNumber of time periods = {0:d}".format(
-                len(self.ptint))
-            str_repr += '\n\nNumber of open periods = {0:d}'.format(len(self.opint))
+            str_repr += "\nNumber of resolved intervals = {0:d}".format(len(self.rtint))
+            str_repr += "\nNumber of time periods = {0:d}".format(len(self.periods.intervals))
+            str_repr += '\n\nNumber of open periods = {0:d}'.format(len(openings))
             str_repr += ('\nMean and SD of open periods = {0:.9f} +/- {1:.9f} ms'.
-                format(np.average(self.opint)*1000, np.std(self.opint)*1000))
+                format(np.average(openings)*1000, np.std(openings)*1000))
             str_repr += ('\nRange of open periods from {0:.9f} ms to {1:.9f} ms'.
-                format(np.min(self.opint)*1000, np.max(self.opint)*1000))
-            str_repr += ('\n\nNumber of shut intervals = {0:d}'.format(len(self.shint)))
+                format(np.min(openings)*1000, np.max(openings)*1000))
+            str_repr += '\n\nNumber of shut intervals = {0:d}'.format(len(shuttings))
             str_repr += ('\nMean and SD of shut periods = {0:.9f} +/- {1:.9f} ms'.
-                format(np.average(self.shint)*1000, np.std(self.shint)*1000))
+                format(np.average(shuttings)*1000, np.std(shuttings)*1000))
             str_repr += ('\nRange of shut periods from {0:.9f} ms to {1:.9f} ms'.
-                format(np.min(self.shint)*1000, np.max(self.shint)*1000))
+                format(np.min(shuttings)*1000, np.max(shuttings)*1000))
         return str_repr
     
     def _set_resolution(self, tres=0.0):
@@ -239,33 +238,31 @@ class SingleChannelRecord(object):
             self.rprop = self.rprop[:-1]
 
     def _set_periods(self):
-        self.periods = Periods(self.rtint, self.rampl, self.rprop)
-        self.ptint, self.pampl, self.pprop = self.periods.all()
-        self.opint, self.opamp, self.oppro = self.periods.open()
-        self.shint, self.shamp, self.shpro = self.periods.shut()
+        self.__periods = Periods(self.rtint, self.rampl, self.rprop)
+    def _get_periods(self):
+        return self.__periods
+    periods = property(_get_periods, _set_periods)
 
 
 class Periods:
-    """ """
+    """ Separate the entire record into periods when channel is open or shut.
+        There may be many amplitude transitions during one opening, each of 
+        which will count as an individual opening, so generally better to
+        look at 'open periods'. """
     def __init__(self, rintervals, ramplitudes, rflags=None):
         rprops = rflags if rflags is not None else np.zeros(len(rintervals))
-        self.ptint, self.pampl, self.pprop = [], [], []
+        self.intervals, self.amplitudes, self.flags = [], [], []
         self._set_periods(rintervals, ramplitudes, rprops)
 
     def __append_period_to_list(self, oint, oamp, oopt):
         try:
-            self.pampl.append(oamp / oint)
+            self.amplitudes.append(oamp / oint)
         except:
-            self.pampl.append(oamp)
-        self.ptint.append(oint)
-        self.pprop.append(oopt)
+            self.amplitudes.append(oamp)
+        self.intervals.append(oint)
+        self.flags.append(oopt)
 
     def _set_periods(self, rintervals, ramplitudes, rprops):
-        """ Separate the entire record into periods when channel is open or shut.
-        There may be many amplitude transitions during one opening, each of 
-        which will count as an individual opening, so generally better to
-        look at 'open periods'. """
-        
         oint, oamp, oopt = rintervals[0], ramplitudes[0] * rintervals[0], rprops[0]
         for t, a, o in zip(rintervals[1 : ], ramplitudes[1 : ], rprops[1 : ]):
             if o >= 8: oopt = 8
@@ -279,29 +276,20 @@ class Periods:
                 oint, oamp, oopt = t, a, o
         self.__append_period_to_list(oint, oamp, oopt) # append last period
 
-    def open(self):
-        # TODO: remove bad intervals befor returning
-        return self.ptint[0::2], self.pampl[0::2], self.pprop[0::2]
+    def get_open_intervals(self):
+        return self.intervals[0::2]
 
-    def shut(self):
-        # TODO: remove bad intervals befor returning
-        return self.ptint[1::2], self.pampl[1::2], self.pprop[1::2]
-
-    def all(self):
-        # TODO: remove bad intervals befor returning
-        return self.ptint, self.pampl, self.pprop
+    def get_shut_intervals(self):
+        return self.intervals[1::2]
 
 
 class Bursts(object):
     """   """
-    def __init__(self, intervals, amplitudes, flags=None, tcrit=None):
-        self.t, self.a = np.array(intervals), np.array(amplitudes)
+    def __init__(self, periods, tcrit=None):
+        self.t, self.a = np.array(periods.intervals), np.array(periods.amplitudes)
+        self.o = np.array(periods.amplitudes)
         self.bursts = None
-        if flags is not None:
-            self.o = flags
-        else:
-            self.o = np.zeros(len(intervals))
-
+        
     def slice_bursts(self, tcrit):
         """Cut entire single channel record into clusters using critical shut time
         interval (tcrit).

@@ -9,7 +9,10 @@ from matplotlib import ticker
 from ekdist import eklib
 
 def stability_intervals(rec, open=True, shut=True, popen=True, window=50):
-    opma, shma, poma = eklib.moving_average_open_shut_Popen(rec.opint[:-1], rec.shint, window=window)
+    opma, shma, poma = eklib.moving_average_open_shut_Popen(
+                       rec.periods.get_open_intervals()[:-1], 
+                       rec.periods.get_shut_intervals(), 
+                       window=window)
     x = np.linspace(0, np.prod(opma.shape), num=np.prod(opma.shape), endpoint=True)
     fig = plt.figure(figsize=(6,3))
     ax = fig.add_subplot(111)
