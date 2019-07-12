@@ -184,7 +184,7 @@ def fit_exponentials(tau, area, X):
 def hessian(theta, LLfunc, args, delta_step=0.0001):
     """ """
     hess = np.zeros((theta.size, theta.size))
-    deltas = optimal_deltas(theta, LLfunc, args, delta_step)
+    deltas = __optimal_deltas(theta, LLfunc, args, delta_step)
     # Diagonal elements of Hessian
     coe11 = np.array([theta.copy(), ] * theta.size) + np.diag(deltas)
     coe33 = np.array([theta.copy(), ] * theta.size) - np.diag(deltas)
@@ -213,23 +213,22 @@ def hessian(theta, LLfunc, args, delta_step=0.0001):
                     (4 * deltas[i] * deltas[j]))
     return hess
 
-def optimal_deltas(theta, LLfunc, args, step_factor=0.0001):
-    """ """
-    Lcrit = LLfunc(theta, args) + math.fabs(LLfunc(theta, args)*0.005)
+def __tune_deltas(theta, func, args, Lcrit, deltas, increase=True):
+    factor = [1, 2] if increase else [-1, 0.5]
+    count = 0
+    while factor[0] * func(theta + deltas, args) < factor[0] * Lcrit and count < 100:
+        deltas *= factor[1]
+        count += 1
+    return deltas
+
+def __optimal_deltas(theta, LLfunc, args, step_factor=0.0001):
+    Lcrit = LLfunc(theta, args) + math.fabs(LLfunc(theta, args) * 0.005)
     deltas = step_factor * theta
     L = LLfunc(theta + deltas, args)
     if L < Lcrit:
-        count = 0
-        while L < Lcrit and count < 100:
-            deltas *= 2
-            L = LLfunc(theta + deltas, args)
-            count += 1
+        deltas = __tune_deltas(theta, LLfunc, args, Lcrit, deltas, increase=True)
     elif L > Lcrit:
-        count = 0
-        while L > Lcrit and count < 100:
-            deltas *= 0.5
-            L = LLfunc(theta + deltas, args)
-            count += 1
+        deltas = __tune_deltas(theta, LLfunc, args, Lcrit, deltas, increase=False)
     return deltas
 
 def covariance_matrix(theta, func, args, weightmode=1):
