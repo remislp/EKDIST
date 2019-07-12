@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from numpy import linalg as nplin
 from scipy.optimize import minimize, bisect
 
 def moving_average(x, n):
@@ -145,7 +146,7 @@ def LLexp(theta, X): # wrapper for log likelihood of exponential pdf
     if np.sum(area[:-1]) >= 1: 
         area[:-1] = 0.99 * area[:-1] / np.sum(area[:-1])
     area[-1] = 1 - np.sum(area[:-1])    
-    return _log_likelihood_exponential_pdf(tau, area, X)
+    return _log_likelihood_exponential_pdf(tau, area, np.asarray(X))
 
 def _predicted_number_per_component(theta, X): # predicted # of intervals per component
     tau, area = _theta_unsqueeze(theta)
@@ -177,3 +178,96 @@ def fit_exponentials(tau, area, X):
     print (res.message)
     print('Final LogLikelihood = {0:.6f}\n'.format(res.fun))
     return res
+
+##### calculate approximate SD ###########################################
+
+def hessian(theta, LLfunc, args, delta_step=0.0001):
+    """ """
+    hess = np.zeros((theta.size, theta.size))
+    deltas = optimal_deltas(theta, LLfunc, args, delta_step)
+    # Diagonal elements of Hessian
+    coe11 = np.array([theta.copy(), ] * theta.size) + np.diag(deltas)
+    coe33 = np.array([theta.copy(), ] * theta.size) - np.diag(deltas)
+    for i in range(theta.size):
+        hess[i, i] = ((LLfunc(coe11[i], args) - 
+            2.0 * LLfunc(theta, args) +
+            LLfunc(coe33[i], args)) / (deltas[i]  ** 2))
+    # Non diagonal elements of Hessian
+    for i in range(theta.size):
+        for j in range(theta.size):
+            coe1, coe2, coe3, coe4 = theta.copy(), theta.copy(), theta.copy(), theta.copy()
+            if i != j:                
+                coe1[i] += deltas[i]
+                coe1[j] += deltas[j]
+                coe2[i] += deltas[i]
+                coe2[j] -= deltas[j]
+                coe3[i] -= deltas[i]
+                coe3[j] += deltas[j]
+                coe4[i] -= deltas[i]
+                coe4[j] -= deltas[j]
+                hess[i, j] = ((
+                    LLfunc(coe1, args) -
+                    LLfunc(coe2, args) -
+                    LLfunc(coe3, args) +
+                    LLfunc(coe4, args)) /
+                    (4 * deltas[i] * deltas[j]))
+    return hess
+
+def optimal_deltas(theta, LLfunc, args, step_factor=0.0001):
+    """ """
+    Lcrit = LLfunc(theta, args) + math.fabs(LLfunc(theta, args)*0.005)
+    deltas = step_factor * theta
+    L = LLfunc(theta + deltas, args)
+    if L < Lcrit:
+        count = 0
+        while L < Lcrit and count < 100:
+            deltas *= 2
+            L = LLfunc(theta + deltas, args)
+            count += 1
+    elif L > Lcrit:
+        count = 0
+        while L > Lcrit and count < 100:
+            deltas *= 0.5
+            L = LLfunc(theta + deltas, args)
+            count += 1
+    return deltas
+
+def covariance_matrix(theta, func, args, weightmode=1):
+    """ """
+    cov = nplin.inv(np.array(hessian(theta, func, args)))
+#    if weightmode == 1:
+#        errvar = SSD(theta, (func, args))[0] / (args[0].size - theta.size)
+#    else:
+#        errvar = 1.0
+    return cov #* errvar
+
+def correlation_matrix(covar):
+    correl = np.zeros((len(covar),len(covar)))
+    for i1 in range(len(covar)):
+        for j1 in range(len(covar)):
+            correl[i1,j1] = (covar[i1,j1] / 
+                np.sqrt(np.multiply(covar[i1,i1],covar[j1,j1])))
+    return correl
+
+def approximate_SD(theta, func, arg, delta_step=0.0001):
+    hess = hessian(theta, func, arg, delta_step)
+    covariance = nplin.inv(hess)
+    sd = np.sqrt(covariance.diagonal())
+    __print_exps_with_errs(theta, sd)
+    return sd
+
+def __errs_unsqueeze(sd):
+    sd = np.asarray(sd)
+    tsd, asd = np.split(sd, [int(math.ceil(len(sd) / 2))]) # pylint: disable=unbalanced-tuple-unpacking
+    asd = np.append(asd, asd[-1])
+    return tsd, asd
+
+def __print_exps_with_errs(theta, apprSD):
+    tau, area = _theta_unsqueeze(theta)
+    tsd, asd = __errs_unsqueeze(apprSD)
+    for ta, ar, td, ad in zip(tau, area, tsd, asd):
+        print('Tau = {0:.6f}; approximate SD = {1:.6f}'.format(ta, td))
+        print('Area= {0:.6f}; approximate SD = {1:.6f}'.format(ar, ad))
+
+##########
+

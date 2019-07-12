@@ -1,4 +1,9 @@
-__version__ = "0.0.12"
+__version__ = "0.0.13"
+
+# Version 0.0.13
+# Released 12/07/2019
+# - eklib.py: calculate approximate SD of fitting estimates
+# - test_errors.py added
 
 # Version 0.0.12
 # Released 10/07/2019
