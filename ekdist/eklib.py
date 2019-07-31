@@ -74,7 +74,7 @@ def expPDF_misclassified_printout(tcrit, enf, ens, pf, ps):
         .format((enf + ens) * 100))
 
 def get_tcrits(pars):
-    tau, area = _theta_unsqueeze(pars)
+    tau, area = __theta_unsqueeze(pars)
     tcrits = np.empty((3, len(tau)-1))
     for i in range(len(tau)-1):
         print('\nCritical time between components {0:d} and {1:d}\n'.
@@ -117,67 +117,113 @@ def get_tcrits(pars):
     return tcrits
 
 ##### fitting exponential pdf's ###############################################
-def myexp(theta, X):
-    tau, area = _theta_unsqueeze(theta)
-    y = np.array([])
-    for t in np.nditer(np.asarray(X)):
-        y = np.append(y, np.sum((area / tau) * np.exp(-t / tau)))
-    return y
 
-def _theta_unsqueeze(theta):
+class ExponentialPDF(object):
+    def __init__(self, tau, area):
+        """        """
+        self.eqname = 'exponential pdf'
+        self.tau = np.asarray(tau)
+        if len(tau) == len(area):
+            self.area = np.asarray(area)
+        else:
+            self.area = np.append(np.asarray(area), 1 - np.sum(area))
+        self.pars = np.concatenate((self.tau, self.area))
+        self.ncomp = len(tau)
+        #self.guess = None
+        self._theta = None
+        self.fixed = [False, False] * self.ncomp
+        self.fixed[-1] = True
+        #self.names = ['tau', 'area']
+        
+    def exp(self, theta, X):
+        tau, area = self.__theta_unsqueeze(theta)
+        X = np.asarray(X)
+        y = np.array([])
+        for t in np.nditer(X):
+            y = np.append(y, np.sum((area / tau) * np.exp(-t / tau)))
+        return y
+
+    def LL(self, theta, X):
+        tau, area = self.__theta_unsqueeze(theta)
+        tau[tau < 1.0e-30] = 1e-8
+        area[area > 1.0] = 0.99999
+        area[area < 0.0] = 1e-6
+        if np.sum(area[:-1]) >= 1: 
+            area[:-1] = 0.99 * area[:-1] / np.sum(area[:-1])
+        area[-1] = 1 - np.sum(area[:-1])    
+        return self.__log_likelihood_exponential_pdf(tau, area, np.asarray(X))
+
+    def __log_likelihood_exponential_pdf(self, tau, area, X):
+        d = np.sum( area * (np.exp(-min(X) / tau) - np.exp(-max(X)/ tau)))
+        if d < 1.e-37:
+            print (' ERROR in EXPLIK: d = ', d)
+        s = 0.0
+        for t in np.nditer(np.asarray(X)):
+            s -= math.log(np.sum((area / tau) * np.exp(-t / tau)))
+        return s + len(X) * math.log(d)
+
+    def _set_theta(self, theta):
+        if self.pars is None:
+            self.pars = np.zeros(len(theta) + 1)
+        for each in np.nonzero(self.fixed)[0]:   
+            theta = np.insert(theta, each, self.pars[each])
+        self.pars = theta
+    def _get_theta(self):
+        theta = self.pars[np.nonzero(np.invert(self.fixed))[0]]
+        if isinstance(theta, float):
+            theta = np.array([theta])
+        return theta
+    theta = property(_get_theta, _set_theta)
+
+    def __theta_unsqueeze(self, theta):
+        tau, area = np.split(np.asarray(theta), [int(math.ceil(len(theta) / 2))]) # pylint: disable=unbalanced-tuple-unpacking
+        area = np.append(area, 1 - np.sum(area))
+        return tau, area
+
+    def __predicted_number_per_component(self, X): # predicted # of intervals per component
+        p1 = np.sum(self.area * np.exp(-min(X) / self.tau))  #Prob(obs>ylow)
+        p2 = np.sum(self.area * np.exp(-max(X) / self.tau))  #Prob(obs>yhigh)
+        antrue = len(X) / (p1 - p2)
+        en = antrue * self.area
+        enout = [antrue * (1. - p1), antrue * p2]
+        return en, enout
+
+    def __print_exps(self, X):
+        numb, numout = self.__predicted_number_per_component(X)
+        for ta, ar, nu in zip(self.tau, self.area, numb):
+            print('Tau = {0:.6f}; lambda (1/s)= {1:.6f}'.format(ta, 1.0 / ta))
+            print('Area= {0:.6f}; predicted number of intervals = {1:.3f};'.format(ar, nu) + 
+                'amplitude (1/s) = {0:.3f}'.format(ar / ta))
+        print('\nOverall mean = {0:.6f}'.format(np.sum(self.area * self.tau)))
+        print('Predicted true number of events = ', np.sum(numb))
+        print('Number of fitted = ', len(X))
+        print('Predicted number below Ylow = {0:.3f}; predicted number above Yhigh = {1:.3f}'.
+            format(numout[0], numout[1]))
+
+    def fit(self, X):
+        print('Start LogLikelihood =', self.LL(self.theta, X))
+        res = minimize(self.LL, self.theta, args=X, method='Nelder-Mead')
+        print (res.message)
+        print('Final LogLikelihood = {0:.6f}\n'.format(res.fun))
+        self.tau, self.area = self.__theta_unsqueeze(res.x)
+        self._set_theta(res.x)
+        self.__print_exps(X)
+
+
+def __theta_unsqueeze(theta):
     tau, area = np.split(np.asarray(theta), [int(math.ceil(len(theta) / 2))]) # pylint: disable=unbalanced-tuple-unpacking
     area = np.append(area, 1 - np.sum(area))
     return tau, area
 
-def _log_likelihood_exponential_pdf(tau, area, X):
-    d = np.sum( area * (np.exp(-min(X) / tau) - np.exp(-max(X)/ tau)))
-    if d < 1.e-37:
-        print (' ERROR in EXPLIK: d = ', d)
-    s = 0.0
-    for t in np.nditer(np.asarray(X)):
-        s -= math.log(np.sum((area / tau) * np.exp(-t / tau)))
-    return s + len(X) * math.log(d)
-
-def LLexp(theta, X): # wrapper for log likelihood of exponential pdf
-    tau, area = _theta_unsqueeze(theta)
-    tau[tau < 1.0e-30] = 1e-8
-    area[area > 1.0] = 0.99999
-    area[area < 0.0] = 1e-6
-    if np.sum(area[:-1]) >= 1: 
-        area[:-1] = 0.99 * area[:-1] / np.sum(area[:-1])
-    area[-1] = 1 - np.sum(area[:-1])    
-    return _log_likelihood_exponential_pdf(tau, area, np.asarray(X))
-
-def _predicted_number_per_component(theta, X): # predicted # of intervals per component
-    tau, area = _theta_unsqueeze(theta)
-    p1 = np.sum(area * np.exp(-min(X) / tau))  #Prob(obs>ylow)
-    p2 = np.sum(area * np.exp(-max(X) / tau))  #Prob(obs>yhigh)
-    antrue = len(X) / (p1 - p2)
-    en = antrue * area
-    enout = [antrue * (1. - p1), antrue * p2]
-    return en, enout
-
-def print_exps(theta, X):
-    tau, area = _theta_unsqueeze(theta)
-    numb, numout = _predicted_number_per_component(theta, X)
-    for ta, ar, nu in zip(tau, area, numb):
-        print('Tau = {0:.6f}; lambda (1/s)= {1:.6f}'.format(ta, 1.0 / ta))
-        print('Area= {0:.6f}; predicted number of intervals = {1:.3f};'.format(ar, nu) + 
-              'amplitude (1/s) = {0:.3f}'.format(ar / ta))
-    print('\nOverall mean = {0:.6f}'.format(np.sum(area * tau)))
-    print('Predicted true number of events = ', np.sum(numb))
-    print('Number of fitted = ', len(X))
-    print('Predicted number below Ylow = {0:.3f}; predicted number above Yhigh = {1:.3f}'.
-          format(numout[0], numout[1]))
-
-def fit_exponentials(tau, area, X):
-    # TODO: check that area has one element less (len(tau)=len(area)+1)
-    theta = tau + area
-    print('Start LogLikelihood =', LLexp(theta, X))
-    res = minimize(LLexp, theta, args=X, method='Nelder-Mead')
-    print (res.message)
-    print('Final LogLikelihood = {0:.6f}\n'.format(res.fun))
-    return res
+#def fit_exponentials(tau, area, X):
+#    # TODO: check that area has one element less (len(tau)=len(area)+1)
+#    theta = tau + area
+#    epdf = ExponentialPDF(tau, area)
+#    print('Start LogLikelihood =', epdf.LL(theta, X))
+#    res = minimize(epdf.LL, theta, args=X, method='Nelder-Mead')
+#    print (res.message)
+#    print('Final LogLikelihood = {0:.6f}\n'.format(res.fun))
+#    return res
 
 ##### calculate approximate SD ###########################################
 
@@ -262,7 +308,7 @@ def __errs_unsqueeze(sd):
     return tsd, asd
 
 def __print_exps_with_errs(theta, apprSD):
-    tau, area = _theta_unsqueeze(theta)
+    tau, area = __theta_unsqueeze(theta)
     tsd, asd = __errs_unsqueeze(apprSD)
     for ta, ar, td, ad in zip(tau, area, tsd, asd):
         print('Tau = {0:.6f}; approximate SD = {1:.6f}'.format(ta, td))

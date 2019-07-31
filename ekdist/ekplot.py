@@ -81,10 +81,9 @@ def __histogram_bins_per_decade(X):
 def __bin_width(X):
     return math.exp(math.log(10.0) / float(__histogram_bins_per_decade(X)))
 
-def __exponential_scale_factor(X, pars, tres):
-    tau, area = eklib._theta_unsqueeze(pars)
+def __exponential_scale_factor(X, pdf, tres):
     return (len(X) * math.log10(__bin_width(X)) * math.log(10) *
-            (1 / np.sum(area * np.exp(-tres / tau))))
+            (1 / np.sum(pdf.area * np.exp(-tres / pdf.tau))))
 
 def prepare_xlog_hist(X, tres):
     """ Prepare x-log histogram.     
@@ -110,7 +109,7 @@ def prepare_xlog_hist(X, tres):
     yout = [0] + [y for pair in zip(hist, hist) for y in pair] + [0]
     return xout, yout
 
-def histogram_xlog_ysqrt_data(X, tres, fitpars=None, tcrit=None, xlabel='Dwell times'):
+def histogram_xlog_ysqrt_data(X, tres, pdf=None, tcrit=None, xlabel='Dwell times'):
     """ Plot dwell time histogram in log x and square root y. """
     xout, yout= prepare_xlog_hist(X, tres)
     fig = plt.figure(figsize=(3,3))
@@ -118,12 +117,11 @@ def histogram_xlog_ysqrt_data(X, tres, fitpars=None, tcrit=None, xlabel='Dwell t
     ax.semilogx(xout, np.sqrt(yout))
     ax.set_xlabel(xlabel)
     ax.set_ylabel('sqrt(frequency)')
-    if fitpars is not None:
-        scale = __exponential_scale_factor(X, fitpars, tres)
+    if pdf is not None:
+        scale = __exponential_scale_factor(X, pdf, tres)
         t = np.logspace(math.log10(tres), math.log10(2 * max(X)), 512)
-        ax.plot(t, np.sqrt(scale * t * eklib.myexp(fitpars, t)), '-b')
-        tau, area = eklib._theta_unsqueeze(fitpars)
-        for ta, ar in zip(tau, area):
+        ax.plot(t, np.sqrt(scale * t * pdf.exp(pdf.theta, t)), '-b')
+        for ta, ar in zip(pdf.tau, pdf.area):
             ax.plot(t, np.sqrt(scale * t * (ar / ta) * np.exp(-t / ta)), '--b')
     if tcrit is not None:
         for tc in np.asarray(tcrit):

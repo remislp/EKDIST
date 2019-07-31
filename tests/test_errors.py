@@ -12,11 +12,13 @@ class TestErrorCalculation:
     def setUp(self):
         self.infile = "./tests/intervals.txt"
         self.intervals = np.loadtxt(self.infile)
-        self.theta = [0.036, 1.1, 0.20]
-        self.res = minimize(eklib.LLexp, self.theta, 
+        self.tau, self.area = [0.036, 1.1], [0.20]
+        self.theta = self.tau + self.area
+        self.epdf = eklib.ExponentialPDF(self.tau, self.area)
+        self.res = minimize(self.epdf.LL, self.epdf.theta, 
                             args=self.intervals, 
                             method='Nelder-Mead')
-        self.hess = eklib.hessian(self.res.x, eklib.LLexp, self.intervals)
+        self.hess = eklib.hessian(self.res.x, self.epdf.LL, self.intervals)
         #self.cov = eklib.covariance_matrix(self.theta, eklib.LLexp, self.intervals)
         self.cov = nplin.inv(self.hess)
         self.appSD = np.sqrt(self.cov.diagonal())
@@ -29,7 +31,7 @@ class TestErrorCalculation:
         assert len(self.intervals)  == 125
 
     def test_expLogLik(self):
-        npt.assert_almost_equal(eklib.LLexp(self.theta, self.intervals), 87.31806715582867)
+        npt.assert_almost_equal(self.epdf.LL(self.theta, self.intervals), 87.31806715582867)
 
     def test_estimates(self):
         npt.assert_almost_equal(self.res.x, np.array([0.03700718, 1.07302608, 0.19874548]))
