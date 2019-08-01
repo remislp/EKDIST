@@ -8,6 +8,7 @@ from numpy import linalg as nplin
 
 from ekdist import eklib
 from ekdist import errors
+from ekdist import exponentials
 
 class TestErrorCalculation:
     def setUp(self):
@@ -15,7 +16,7 @@ class TestErrorCalculation:
         self.intervals = np.loadtxt(self.infile)
         self.tau, self.area = [0.036, 1.1], [0.20]
         self.theta = self.tau + self.area
-        self.epdf = eklib.ExponentialPDF(self.tau, self.area)
+        self.epdf = exponentials.ExponentialPDF(self.tau, self.area)
         self.res = minimize(self.epdf.LL, self.epdf.theta, 
                             args=self.intervals, 
                             method='Nelder-Mead')

@@ -1,7 +1,6 @@
 import math
 import numpy as np
 from numpy import linalg as nplin
-from scipy.optimize import minimize, bisect
 
 class ApproximateSD:
     def __init__(self, theta, func, arg, delta_step=0.0001):
