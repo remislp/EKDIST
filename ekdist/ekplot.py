@@ -7,6 +7,7 @@ from matplotlib import transforms as mtransforms
 from matplotlib import ticker
 
 from ekdist import eklib
+from ekdist import exponentials
 
 def stability_intervals(rec, open=True, shut=True, popen=True, window=50):
     opma, shma, poma = eklib.moving_average_open_shut_Popen(
@@ -117,12 +118,14 @@ def histogram_xlog_ysqrt_data(X, tres, pdf=None, tcrit=None, xlabel='Dwell times
     ax.semilogx(xout, np.sqrt(yout))
     ax.set_xlabel(xlabel)
     ax.set_ylabel('sqrt(frequency)')
-    if pdf is not None:
-        scale = __exponential_scale_factor(X, pdf, tres)
-        t = np.logspace(math.log10(tres), math.log10(2 * max(X)), 512)
-        ax.plot(t, np.sqrt(scale * t * pdf.exp(pdf.theta, t)), '-b')
-        for ta, ar in zip(pdf.tau, pdf.area):
-            ax.plot(t, np.sqrt(scale * t * (ar / ta) * np.exp(-t / ta)), '--b')
+    t = np.logspace(math.log10(tres), math.log10(2 * max(X)), 512)
+    if pdf is None:
+        pdf = exponentials.ExponentialPDF([np.mean(X)], [1.0])
+    scale = __exponential_scale_factor(X, pdf, tres)
+    ax.plot(t, np.sqrt(scale * t * pdf.exp(pdf.theta, t)), '-b')
+    for ta, ar in zip(pdf.tau, pdf.area):
+        ax.plot(t, np.sqrt(scale * t * (ar / ta) * np.exp(-t / ta)), '--b')
+
     if tcrit is not None:
         for tc in np.asarray(tcrit):
             ax.axvline(x=tc, color='g')
