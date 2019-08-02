@@ -19,6 +19,7 @@ class ExponentialPDF(object):
         self.fixed = [False, False] * self.ncomp
         self.fixed[-1] = True
         #self.names = ['tau', 'area']
+        self.tcrits = np.empty((3, len(self.tau)-1))
         
     def exp(self, theta, X):
         tau, area = self.__theta_unsqueeze(theta)
@@ -94,98 +95,90 @@ class ExponentialPDF(object):
         self._set_theta(res.x)
         self.__print_exps(X)
 
+    def get_tcrits(self, verbose=True):
+        tc = Tcrit(self.tau, self.area, verbose)
+        self.tcrits = tc.tcrits
 
-##### finding tcrit between exponentials ######################################
 
-def expPDF_misclassified(tcrit, tau, area, comp):
-    """ Calculate number and fraction of misclassified events after division into
-    bursts by critical time, tcrit. """
-    tfast, tslow = tau[:comp], tau[comp:]
-    afast, aslow = area[:comp], area[comp:]
-    # Number of misclassified.
-    enf = np.sum(afast * np.exp(-tcrit / tfast))
-    ens = np.sum(aslow * (1 - np.exp(-tcrit / tslow)))
-    # Fraction misclassified.
-    pf = enf / np.sum(afast)
-    ps = ens / np.sum(aslow)
-    return enf, ens, pf, ps
+class Tcrit(object):
+    def __init__(self, tau, area, verbose=False):
+        """ Find tcrit between exponentials """
+        self.tau = tau
+        self.area = area
+        self.tcrits = {}
+        self.verbose = verbose
+        self.__get_tcrits()
+        if self.verbose: self.__print_summary()
 
-def expPDF_tcrit_DC(tcrit, tau, area, comp):
-    """ """
-    _, _, pf, ps = expPDF_misclassified(tcrit, tau, area, comp)
-    return ps - pf
+    def __get_tcrits(self):
 
-def expPDF_tcrit_CN(tcrit, tau, area, comp):
-    """ """
-    enf, ens, _, _ = expPDF_misclassified(tcrit, tau, area, comp)
-    return ens - enf
+        if self.verbose: print('\nEqual % misclassified (DC criterion)')
+        self.tcrits['DC'] = self.__calculate_tcrits(self.__tcrit_DC)
 
-def expPDF_tcrit_Jackson(tcrit, tau, area, comp):
-    """ """
-    tfast, tslow = tau[:comp], tau[comp:]
-    afast, aslow = area[:comp], area[comp:]
-    # Number of misclassified.
-    enf = np.sum((afast / tfast) * np.exp(-tcrit / tfast))
-    ens = np.sum((aslow / tslow) * np.exp(-tcrit / tslow))
-    return enf - ens
+        if self.verbose: print('\nEqual # misclassified (Clapham & Neher criterion)')
+        self.tcrits['C&N'] = self.__calculate_tcrits(self.__tcrit_CN)
 
-def expPDF_misclassified_printout(tcrit, enf, ens, pf, ps):
-    """ """
-    return ('tcrit = {0:.5g} ms\n'.format(tcrit * 1000) +
-        '% misclassified: short = {0:.5g};'.format(pf * 100) +
-        ' long = {0:.5g}\n'.format(ps * 100) +
-        '# misclassified (out of 100): short = {0:.5g};'.format(enf * 100) +
-        ' long = {0:.5g}\n'.format(ens * 100) +
-        'Total # misclassified (out of 100) = {0:.5g}\n'
-        .format((enf + ens) * 100))
-
-def __theta_unsqueeze(theta):
-    tau, area = np.split(np.asarray(theta), [int(math.ceil(len(theta) / 2))]) # pylint: disable=unbalanced-tuple-unpacking
-    area = np.append(area, 1 - np.sum(area))
-    return tau, area
-
-def get_tcrits(pars):
-    tau, area = __theta_unsqueeze(pars)
-    tcrits = np.empty((3, len(tau)-1))
-    for i in range(len(tau)-1):
-        print('\nCritical time between components {0:d} and {1:d}\n'.
-                format(i+1, i+2) + '\nEqual % misclassified (DC criterion)')
-        try:
-            tcrit = bisect(expPDF_tcrit_DC, tau[i], tau[i+1], args=(tau, area, i+1))
-            enf, ens, pf, ps = expPDF_misclassified(tcrit, tau, area, i+1)
-            print(expPDF_misclassified_printout(tcrit, enf, ens, pf, ps))
-        except:
-            print('Bisection with DC criterion failed.\n')
-            tcrit = None
-        tcrits[0, i] = tcrit
+        if self.verbose: print('\nMinimum total # misclassified (Jackson et al criterion)')
+        self.tcrits['Jackson'] = self.__calculate_tcrits(self.__tcrit_Jackson)
         
-        print('Equal # misclassified (Clapham & Neher criterion)')
-        try:
-            tcrit = bisect(expPDF_tcrit_CN, tau[i], tau[i+1], args=(tau, area, i+1))
-            enf, ens, pf, ps = expPDF_misclassified(tcrit, tau, area, i+1)
-            print(expPDF_misclassified_printout(tcrit, enf, ens, pf, ps))
-        except:
-            print('Bisection with Clapham & Neher criterion failed.\n')
-            tcrit = None
-        tcrits[1, i] = tcrit
-            
-        print('Minimum total # misclassified (Jackson et al criterion)')
-        try:
-            tcrit = bisect(expPDF_tcrit_Jackson, tau[i], tau[i+1], args=(tau, area, i+1))
-            enf, ens, pf, ps = expPDF_misclassified(tcrit, tau, area, i+1)
-            print(expPDF_misclassified_printout(tcrit, enf, ens, pf, ps))
-        except:
-            print('\nBisection with Jackson et al criterion failed.')
-            tcrit = None
-        tcrits[2, i] = tcrit
-        
-    print('\n\nSUMMARY of tcrit values:\nComponents\t\tDC\t\tC&N\t\tJackson\n')
-    for i in range(len(tau)-1):
-        print('{0:d} to {1:d} '.format(i+1, i+2) +
-                '\t\t\t{0:.5g}'.format(tcrits[0, i] * 1000) +
-                '\t\t{0:.5g}'.format(tcrits[1, i] * 1000) +
-                '\t\t{0:.5g}\n'.format(tcrits[2, i] * 1000))
-    return tcrits
+    def __calculate_tcrits(self, func):
+        tcrits = []
+        for i in range(len(self.tau)-1):
+            if self.verbose:
+                print('Critical time between components {0:d} and {1:d}'.format(i+1, i+2))
+            try:
+                tcrit = bisect(func, self.tau[i], self.tau[i+1], args=(self.tau, self.area, i+1))
+                enf, ens, pf, ps = self.__misclassified(tcrit, i+1)
+                if self.verbose: self.__print_misclassified(tcrit, enf, ens, pf, ps)
+            except:
+                if self.verbose: print('Bisection failed.')
+                tcrit = None
+            tcrits.append(tcrit)
+        return tcrits
 
+    def __misclassified(self, tcrit, comp):
+        """ Calculate number and fraction of misclassified events after division into
+        bursts by critical time, tcrit. """
+        tfast, tslow = self.tau[:comp], self.tau[comp:]
+        afast, aslow = self.area[:comp], self.area[comp:]
+        # Number of misclassified.
+        enf = np.sum(afast * np.exp(-tcrit / tfast))
+        ens = np.sum(aslow * (1 - np.exp(-tcrit / tslow)))
+        # Fraction misclassified.
+        pf = enf / np.sum(afast)
+        ps = ens / np.sum(aslow)
+        return enf, ens, pf, ps
 
+    def __tcrit_DC(self, tcrit, tau, area, comp):
+        _, _, pf, ps = self.__misclassified(tcrit, comp)
+        return ps - pf
+
+    def __tcrit_CN(self, tcrit, tau, area, comp):
+        enf, ens, _, _ = self.__misclassified(tcrit, comp)
+        return ens - enf
+
+    def __tcrit_Jackson(self, tcrit, tau, area, comp):
+        tfast, tslow = tau[:comp], tau[comp:]
+        afast, aslow = area[:comp], area[comp:]
+        # Number of misclassified.
+        enf = np.sum((afast / tfast) * np.exp(-tcrit / tfast))
+        ens = np.sum((aslow / tslow) * np.exp(-tcrit / tslow))
+        return enf - ens
+
+    def __print_misclassified(self, tcrit, enf, ens, pf, ps):
+        print ('tcrit = {0:.5g} ms\n'.format(tcrit * 1000) +
+            '% misclassified: short = {0:.5g};'.format(pf * 100) +
+            ' long = {0:.5g}\n'.format(ps * 100) +
+            '# misclassified (out of 100): short = {0:.5g};'.format(enf * 100) +
+            ' long = {0:.5g}\n'.format(ens * 100) +
+            'Total # misclassified (out of 100) = {0:.5g}'
+            .format((enf + ens) * 100))
+
+    def __print_summary(self):
+        print ('\nSUMMARY of tcrit values (in ms):\nComponents\t\tDC\t\tC&N\t\tJackson')
+        for i in range(len(self.tau)-1):
+            print('{0:d} to {1:d} '.format(i+1, i+2) +
+                    '\t\t\t{0:.5g}'.format(self.tcrits['DC'][i] * 1000) +
+                    '\t\t{0:.5g}'.format(self.tcrits['C&N'][i] * 1000) +
+                    '\t\t{0:.5g}'.format(self.tcrits['Jackson'][i] * 1000))
 
