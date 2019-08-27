@@ -29,6 +29,9 @@ class TestErrorCalculation:
         #self.cov = nplin.inv(self.hess)
         #self.appSD = asd.sd #np.sqrt(self.cov.diagonal())
         #self.corr = asd.correlations #eklib.correlation_matrix(self.cov)
+        m = 2.0 # corresponds roughly to 2 SD 
+        self.likints = errors.LikelihoodIntervals(self.res.x, self.epdf, 
+                                                  self.intervals, self.asd.sd, m)
 
     def test_infile_exists(self):
         assert os.path.isfile(self.infile)
@@ -59,6 +62,9 @@ class TestErrorCalculation:
                                                      [0.18867387, 1.        , 0.23994593],
                                                      [0.33487997, 0.23994593, 1.        ]]))
 
-
+    def test_likelihood_intervals(self):
+        npt.assert_almost_equal(self.likints.calculate(), np.array([[0.019226384311366168, 0.07101933263063774],
+                                                        [0.8583999525995726, 1.3892163638906025],
+                                                        [0.10969760281850571, 0.3020372371637748]]))
 
     

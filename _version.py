@@ -1,5 +1,14 @@
 __version__ = "0.0.13"
 
+# Version 0.0.14
+# Released 27/08/2019
+# - errors.py: calculate likelihood intervals added
+# - new module errors.py: approximate SD of estimates moved into new module
+# - exponentials.py: new module containg exponential pdf class
+# - test_errors.py updated
+# - test_exponentials added
+# - notebooks updated
+
 # Version 0.0.13
 # Released 12/07/2019
 # - eklib.py: calculate approximate SD of fitting estimates

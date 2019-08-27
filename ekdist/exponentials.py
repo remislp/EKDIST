@@ -4,40 +4,51 @@ from numpy import linalg as nplin
 from scipy.optimize import minimize, bisect
 
 class ExponentialPDF(object):
-    def __init__(self, tau, area):
+    def __init__(self, tau, area=None):
         """        """
         self.eqname = 'exponential pdf'
         self.tau = np.asarray(tau)
-        if len(tau) == len(area):
+        self.ncomps = len(self.tau)
+        self.area = area
+        if area is None:
+            self.area = np.ones(self.ncomps) / self.ncomps
+        elif len(self.tau) == 1:
+            self.area = np.array([1])
+        elif len(tau) == (len(area) + 1):
+             self.area = np.append(np.asarray(area), 1 - np.sum(area))
+        elif len(tau) == len(area):
             self.area = np.asarray(area)
+            self.area[-1] = 1. - np.sum(area)
         else:
-            self.area = np.append(np.asarray(area), 1 - np.sum(area))
+            self.area = np.ones(self.ncomps) / self.ncomps
+
         self.pars = np.concatenate((self.tau, self.area))
-        self.ncomp = len(tau)
-        #self.guess = None
-        self._theta = None
-        self.fixed = [False, False] * self.ncomp
-        self.fixed[-1] = True
-        #self.names = ['tau', 'area']
-        self.tcrits = np.empty((3, len(self.tau)-1))
+        self.fixed = [False, False] * self.ncomps
+        self.fixed[-1] = True        
+        self._theta = self._get_theta()
+        
+        self.names = ['tau'] * self.ncomps + ['area'] * self.ncomps
+        self.tcrits = np.empty((3, self.ncomps - 1))
         
     def exp(self, theta, X):
-        tau, area = self.__theta_unsqueeze(theta)
+        self._set_theta(theta)
+        #tau, area = self.__theta_unsqueeze(theta)
         X = np.asarray(X)
         y = np.array([])
         for t in np.nditer(X):
-            y = np.append(y, np.sum((area / tau) * np.exp(-t / tau)))
+            y = np.append(y, np.sum((self.area / self.tau) * np.exp(-t / self.tau)))
         return y
 
     def LL(self, theta, X):
-        tau, area = self.__theta_unsqueeze(theta)
-        tau[tau < 1.0e-30] = 1e-8
-        area[area > 1.0] = 0.99999
-        area[area < 0.0] = 1e-6
-        if np.sum(area[:-1]) >= 1: 
-            area[:-1] = 0.99 * area[:-1] / np.sum(area[:-1])
-        area[-1] = 1 - np.sum(area[:-1])    
-        return self.__log_likelihood_exponential_pdf(tau, area, np.asarray(X))
+        self._set_theta(theta)
+        #tau, area = self.__theta_unsqueeze(theta)
+        #tau[tau < 1.0e-30] = 1e-8
+        #area[area > 1.0] = 0.99999
+        #area[area < 0.0] = 1e-6
+        #if np.sum(area[:-1]) >= 1: 
+        #    area[:-1] = 0.99 * area[:-1] / np.sum(area[:-1])
+        #area[-1] = 1 - np.sum(area[:-1])    
+        return self.__log_likelihood_exponential_pdf(self.tau, self.area, np.asarray(X))
 
     def __log_likelihood_exponential_pdf(self, tau, area, X):
         d = np.sum( area * (np.exp(-min(X) / tau) - np.exp(-max(X)/ tau)))
@@ -49,11 +60,16 @@ class ExponentialPDF(object):
         return s + len(X) * math.log(d)
 
     def _set_theta(self, theta):
-        if self.pars is None:
-            self.pars = np.zeros(len(theta) + 1)
+        #print("set: theta=", theta)
+        #print("set: pars=", self.pars)
+        #print("set: nonzeros= ", np.nonzero(self.fixed))
         for each in np.nonzero(self.fixed)[0]:   
+        #    print("set: each=", each)
             theta = np.insert(theta, each, self.pars[each])
-        self.pars = theta
+        #    print("set: thetaeach=", theta)
+        self.tau, self.area = np.split(np.asarray(theta), 2) # pylint: disable=unbalanced-tuple-unpacking
+        self.area[-1] = 1. - np.sum(self.area[: -1])
+        self.pars = np.concatenate((self.tau, self.area))
     def _get_theta(self):
         theta = self.pars[np.nonzero(np.invert(self.fixed))[0]]
         if isinstance(theta, float):
